@@ -11,10 +11,10 @@ Everything is drawn in code — the panels are procedural canvas art, the sample
 ## Run it
 
 ```sh
-open index.html
+open app/index.html
 ```
 
-Open `index.html` in a desktop browser. No build step, no server, no network needed.
+Open `app/index.html` in a desktop browser. No build step, no server, no network needed. (Or serve it: `python3 -m http.server 8080 --directory app`, then open http://localhost:8080.)
 
 ---
 

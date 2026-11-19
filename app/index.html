@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LEONIDA Cover Studio — photo to GTA-style cover art</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: #f4efff; font-family: Arial, Helvetica, sans-serif;
+    background: radial-gradient(1200px 620px at 50% -10%, #2a1358 0%, #0b0618 55%);
+  }
+  :root {
+    --ink: #f4efff; --dim: #b9aee0; --card: #150e2e; --edge: #2b1d52;
+    --pink: #ff2e88; --violet: #7b2ff7; --amber: #ff7e3d; --aqua: #2de1c2;
+  }
+  header { text-align: center; padding: 22px 20px 6px; }
+  header h1 {
+    margin: 0; font-family: "Arial Black", Arial, sans-serif; font-size: 34px; letter-spacing: 1px;
+    background: linear-gradient(90deg, var(--pink), var(--violet), var(--amber));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  header p { margin: 6px 0 0; color: var(--dim); font-size: 14px; }
+  .wrap { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; padding: 16px 18px 30px; max-width: 1180px; margin: 0 auto; }
+  .preview { flex: 1 1 420px; max-width: 560px; }
+  #art { width: 100%; height: auto; display: block; background: #000; border: 3px solid #000; outline: 2px solid var(--edge); border-radius: 6px; cursor: grab; touch-action: none; }
+  #art.grabbing { cursor: grabbing; }
+  .tip { color: var(--dim); font-size: 13px; text-align: center; margin: 10px 0 0; }
+  .panel { flex: 1 1 320px; max-width: 420px; background: var(--card); border: 1px solid var(--edge); border-radius: 10px; padding: 16px 18px; }
+  .panel h2 { font-size: 13px; letter-spacing: 2px; color: var(--dim); text-transform: uppercase; margin: 18px 0 8px; }
+  .panel h2:first-child { margin-top: 0; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  button, select, input[type=text] { font: inherit; color: var(--ink); background: #1e1440; border: 1px solid var(--edge); border-radius: 8px; padding: 9px 12px; }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--pink); }
+  button.on { border-color: var(--pink); background: #2c1550; box-shadow: 0 0 0 1px var(--pink) inset; }
+  button.go { background: linear-gradient(90deg, var(--pink), var(--violet)); border: none; font-weight: bold; padding: 12px 16px; width: 100%; font-size: 16px; }
+  .dot { width: 34px; height: 34px; border-radius: 50%; padding: 0; border: 2px solid rgba(255,255,255,.2); }
+  .dot.on { border-color: #fff; box-shadow: 0 0 0 2px var(--pink); }
+  input[type=file] { display: none; }
+  input[type=text] { width: 100%; }
+  input[type=range] { width: 100%; accent-color: var(--pink); }
+  .pick { display: inline-block; background: #1e1440; border: 1px solid var(--edge); border-radius: 8px; padding: 9px 12px; cursor: pointer; }
+  .pick:hover { border-color: var(--pink); }
+  .fine { font-size: 12px; color: var(--dim); line-height: 1.5; }
+  footer { text-align: center; color: var(--dim); font-size: 12px; padding: 0 20px 26px; line-height: 1.6; }
+  /* Screenshot mode: cover only, no chrome. ?shot=cover */
+  body.shot header, body.shot .panel, body.shot .tip, body.shot footer { display: none; }
+  body.shot { background: #000; }
+  body.shot .wrap { padding: 0; margin: 0; max-width: none; display: block; }
+  body.shot .preview { max-width: none; }
+  body.shot #art { border: none; outline: none; border-radius: 0; width: 100vw; height: 100vh; object-fit: contain; }
+</style>
+</head>
+<body>
+<header>
+  <h1>LEONIDA COVER STUDIO</h1>
+  <p>Turn a photo and a caption into GTA-style cover art — offline, in your browser. Your photos never leave this machine.</p>
+</header>
+<div class="wrap">
+  <section class="preview">
+    <canvas id="art" width="1080" height="1350"></canvas>
+    <p class="tip">Drag the photo inside the centre panel to reposition it. Drop a photo anywhere on the page to load it.</p>
+  </section>
+  <section class="panel">
+    <h2>Photo</h2>
+    <div class="btns">
+      <label class="pick" for="file">Choose a photo</label>
+      <input type="file" id="file" accept="image/*">
+      <button id="sampleBtn" type="button">Use sample photo</button>
+    </div>
+    <h2>Zoom &amp; position</h2>
+    <input type="range" id="zoom" min="1" max="3" step="0.05" value="1">
+    <p class="fine">Zoom: <span id="zoomVal">1.00&times;</span> — drag the photo in the centre panel to pan.</p>
+    <h2>Caption</h2>
+    <input type="text" id="title" value="LEONIDA" maxlength="20" placeholder="Title (e.g. LEONIDA)">
+    <div style="height:8px"></div>
+    <input type="text" id="tagline" value="VICE CITY STORIES" maxlength="30" placeholder="Tagline (e.g. VICE CITY STORIES)">
+    <h2>Colour grade</h2>
+    <div class="btns">
+      <button class="dot on" id="g-sunset" type="button" title="Sunset orange" style="background:linear-gradient(135deg,#ff7e3d,#ff4d6d,#7b2ff7)"></button>
+      <button class="dot" id="g-neon" type="button" title="Neon pink-purple" style="background:linear-gradient(135deg,#ff2e88,#7b2ff7,#00f0ff)"></button>
+      <button class="dot" id="g-teal" type="button" title="Teal night" style="background:linear-gradient(135deg,#0f2027,#134e5e,#2de1c2)"></button>
+      <span class="fine" id="gradeName">Sunset orange</span>
+    </div>
+    <h2>Layout</h2>
+    <div class="btns">
+      <button class="on" id="l-grid" type="button">3 &times; 3 panels</button>
+      <button id="l-hero" type="button">Hero photo</button>
+    </div>
+    <h2>Export size</h2>
+    <div class="btns">
+      <button class="on" id="s-portrait" type="button">Portrait 1080&times;1350</button>
+      <button id="s-square" type="button">Square 1080&times;1080</button>
+      <button id="s-story" type="button">Story 1080&times;1920</button>
+    </div>
+    <div style="height:16px"></div>
+    <button class="go" id="exportBtn" type="button">Export PNG</button>
+    <p class="fine">Exports the cover exactly as previewed. Original artwork drawn in code — no Rockstar logo, art or fonts.</p>
+  </section>
+</div>
+<footer>
+  Works fully offline from its own static files. No uploads, no tracking, no network calls.<br>
+  An original fan-made tool in the visual language of GTA-style poster art.
+</footer>
+<script>
+(function () {
+  'use strict';
+
+  // Colour grades: each one repaints the whole cover.
+  var GRADES = {
+    sunset: { label: 'Sunset orange', top: '#ff7e3d', mid: '#ff4d6d', bot: '#7b2ff7', sea: '#1b3a6b', glow: '#ffb347', neon: '#ff2e88', dark: '#14082b' },
+    neon:   { label: 'Neon pink-purple', top: '#ff2e88', mid: '#7b2ff7', bot: '#1b0f3b', sea: '#0d2b45', glow: '#ff5ce1', neon: '#00f0ff', dark: '#0b0618' },
+    teal:   { label: 'Teal night', top: '#0f2027', mid: '#134e5e', bot: '#0a3d4f', sea: '#062a33', glow: '#2de1c2', neon: '#7df9ff', dark: '#04141a' }
+  };
+  var SIZES = { square: [1080, 1080], portrait: [1080, 1350], story: [1080, 1920] };
+
+  var S = {
+    img: null, zoom: 1, px: 0, py: 0,
+    grade: 'sunset', layout: 'grid', size: 'portrait',
+    title: 'LEONIDA', tag: 'VICE CITY STORIES'
+  };
+  var centre = null; // centre panel rect, canvas pixels (grid layout)
+  var full = null;   // full photo rect, canvas pixels (hero layout)
+
+  var cv = document.getElementById('art');
+  var cx = cv.getContext('2d');
+
+  // ---------- drawing helpers ----------
+
+  function vgrad(c, x, y, w, h, stops) {
+    var g = c.createLinearGradient(x, y, x, y + h);
+    for (var i = 0; i < stops.length; i++) g.addColorStop(stops[i][0], stops[i][1]);
+    return g;
+  }
+  function drawSky(c, x, y, w, h, g) {
+    c.fillStyle = vgrad(c, x, y, w, h, [[0, g.top], [0.55, g.mid], [1, g.bot]]);
+    c.fillRect(x, y, w, h);
+  }
+  function drawSun(c, x, y, r, g) {
+    var halo = c.createRadialGradient(x, y, r * 0.1, x, y, r * 2.2);
+    halo.addColorStop(0, g.glow);
+    halo.addColorStop(0.35, g.glow + '55');
+    halo.addColorStop(1, g.glow + '00');
+    c.fillStyle = halo;
+    c.beginPath(); c.arc(x, y, r * 2.2, 0, 7); c.fill();
+    c.fillStyle = g.glow;
+    c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+  }
+  function drawSea(c, x, y, w, h, g) {
+    c.fillStyle = g.sea;
+    c.fillRect(x, y, w, h);
+    c.fillStyle = g.glow + '44';
+    for (var i = 0; i < 4; i++) {
+      c.fillRect(x + w * (0.08 + i * 0.22), y + h * (0.2 + i * 0.18), w * 0.12, 2);
+    }
+  }
+  function drawCity(c, x, y, w, h, g) {
+    c.fillStyle = g.dark;
+    var bx = x;
+    while (bx < x + w) {
+      var bw = w * (0.06 + Math.random() * 0.09);
+      var bh = h * (0.25 + Math.random() * 0.55);
+      c.fillRect(bx, y + h - bh, bw, bh);
+      bx += bw + w * 0.015;
+    }
+    c.fillStyle = g.glow + 'aa';
+    for (var i = 0; i < 14; i++) {
+      c.fillRect(x + Math.random() * w, y + h * (0.3 + Math.random() * 0.6), 3, 3);
+    }
+  }
+  function drawPalm(c, x, y, s, color) {
+    c.strokeStyle = color; c.fillStyle = color;
+    c.lineWidth = Math.max(2, s * 0.055); c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x, y);
+    c.quadraticCurveTo(x + s * 0.08, y - s * 0.55, x + s * 0.16, y - s * 0.95);
+    c.stroke();
+    var tx = x + s * 0.16, ty = y - s * 0.95;
+    for (var i = 0; i < 6; i++) {
+      var a = -Math.PI * (0.06 + i * 0.17);
+      c.beginPath(); c.moveTo(tx, ty);
+      c.quadraticCurveTo(tx + Math.cos(a) * s * 0.26, ty + Math.sin(a) * s * 0.26 - s * 0.05,
+                          tx + Math.cos(a) * s * 0.48, ty + Math.sin(a) * s * 0.48 + s * 0.12);
+      c.stroke();
+    }
+    c.beginPath();
+    c.arc(tx - 3, ty + 4, 3, 0, 7); c.arc(tx + 4, ty + 5, 3, 0, 7);
+    c.fill();
+  }
+  function heavyText(c, text, x, y, size, fill, edge) {
+    c.font = '900 ' + size + 'px "Arial Black", Arial, sans-serif';
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
+    c.strokeStyle = edge || '#12082b';
+    c.lineWidth = Math.max(2, size * 0.13);
+    c.strokeText(text, x, y);
+    c.fillStyle = fill || '#ffffff';
+    c.fillText(text, x, y);
+  }
+  function outline(c, x, y, w, h, g) {
+    c.strokeStyle = g.glow; c.globalAlpha = 0.85;
+    c.lineWidth = Math.max(2, w * 0.008);
+    c.strokeRect(x + 1, y + 1, w - 2, h - 2);
+    c.globalAlpha = 1;
+  }
+
+  // ---------- the eight art panels (every pixel drawn in code) ----------
+
+  function artHeli(c, x, y, w, h, g) {
+    drawSky(c, x, y, w, h * 0.62, g);
+    drawSun(c, x + w * 0.68, y + h * 0.3, w * 0.09, g);
+    drawSea(c, x, y + h * 0.62, w, h * 0.38, g);
+    drawCity(c, x, y + h * 0.42, w, h * 0.2, g);
+    var hx = x + w * 0.42, hy = y + h * 0.3;
+    c.fillStyle = '#10182b';
+    c.beginPath(); c.ellipse(hx, hy, w * 0.17, h * 0.085, 0, 0, 7); c.fill();
+    c.fillRect(hx + w * 0.1, hy - h * 0.02, w * 0.2, h * 0.035);
+    c.fillRect(hx + w * 0.27, hy - h * 0.09, w * 0.03, h * 0.12);
+    c.strokeStyle = '#10182b'; c.lineWidth = Math.max(2, w * 0.012);
+    c.beginPath(); c.moveTo(hx - w * 0.22, hy - h * 0.1); c.lineTo(hx + w * 0.24, hy - h * 0.1); c.stroke();
+    c.beginPath(); c.moveTo(hx - w * 0.1, hy + h * 0.1); c.lineTo(hx - w * 0.06, hy + h * 0.16); c.stroke();
+    c.beginPath(); c.moveTo(hx + w * 0.1, hy + h * 0.1); c.lineTo(hx + w * 0.06, hy + h * 0.16); c.stroke();
+    c.fillStyle = '#9fd8ff';
+    c.beginPath(); c.ellipse(hx - w * 0.05, hy - h * 0.02, w * 0.06, h * 0.04, 0, 0, 7); c.fill();
+  }
+  function artStreet(c, x, y, w, h, g) {
+    c.fillStyle = g.dark; c.fillRect(x, y, w, h);
+    for (var i = 0; i < 4; i++) {
+      var bw = w * 0.24;
+      c.fillStyle = i % 2 ? '#1b1140' : '#241655';
+      c.fillRect(x + i * bw, y, bw - 2, h * 0.72);
+      c.fillStyle = g.neon;
+      for (var r = 0; r < 5; r++) c.fillRect(x + i * bw + 6, y + 12 + r * h * 0.12, bw * 0.5, 3);
+    }
+    c.fillStyle = g.neon; c.fillRect(x + w * 0.06, y + h * 0.12, w * 0.2, h * 0.05);
+    c.fillStyle = g.glow; c.fillRect(x + w * 0.62, y + h * 0.3, w * 0.3, h * 0.04);
+    c.fillStyle = vgrad(c, x, y + h * 0.72, w, h * 0.28, [[0, g.mid], [1, g.dark]]);
+    c.fillRect(x, y + h * 0.72, w, h * 0.28);
+    drawPalm(c, x + w * 0.82, y + h * 0.98, h * 0.55, '#05020e');
+    drawPalm(c, x + w * 0.14, y + h * 0.98, h * 0.42, '#05020e');
+  }
+  function artCar(c, x, y, w, h, g) {
+    drawSky(c, x, y, w, h * 0.55, g);
+    drawSun(c, x + w * 0.2, y + h * 0.24, w * 0.07, g);
+    c.fillStyle = '#0d0d1a'; c.fillRect(x, y + h * 0.55, w, h * 0.45);
+    c.fillStyle = g.glow + '55'; c.fillRect(x, y + h * 0.55, w, 3);
+    var cy = y + h * 0.68;
+    c.fillStyle = '#ffd21f';
+    c.beginPath();
+    c.moveTo(x + w * 0.08, cy + h * 0.1); c.lineTo(x + w * 0.14, cy - h * 0.02);
+    c.lineTo(x + w * 0.38, cy - h * 0.08); c.lineTo(x + w * 0.66, cy - h * 0.05);
+    c.lineTo(x + w * 0.9, cy + h * 0.04); c.lineTo(x + w * 0.92, cy + h * 0.1);
+    c.closePath(); c.fill();
+    c.fillStyle = '#0b1020';
+    c.beginPath(); c.ellipse(x + w * 0.36, cy - h * 0.03, w * 0.13, h * 0.045, 0, 0, 7); c.fill();
+    c.strokeStyle = '#ffd21f'; c.lineWidth = Math.max(3, w * 0.02); c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x + w * 0.3, cy - h * 0.05); c.lineTo(x + w * 0.22, cy - h * 0.34); c.stroke();
+    c.beginPath(); c.moveTo(x + w * 0.62, cy - h * 0.05); c.lineTo(x + w * 0.72, cy - h * 0.32); c.stroke();
+    c.fillStyle = '#05050c';
+    c.beginPath(); c.arc(x + w * 0.22, cy + h * 0.1, w * 0.075, 0, 7); c.fill();
+    c.beginPath(); c.arc(x + w * 0.78, cy + h * 0.1, w * 0.075, 0, 7); c.fill();
+    c.fillStyle = '#fff6c9';
+    c.beginPath(); c.arc(x + w * 0.9, cy + h * 0.02, w * 0.02, 0, 7); c.fill();
+  }
+  function artBiker(c, x, y, w, h, g) {
+    c.fillStyle = g.dark; c.fillRect(x, y, w, h);
+    c.fillStyle = g.mid + '66'; c.fillRect(x, y + h * 0.62, w, h * 0.38);
+    c.fillStyle = '#101b33';
+    c.fillRect(x + w * 0.08, y + h * 0.66, w * 0.84, h * 0.16);
+    c.fillRect(x + w * 0.2, y + h * 0.56, w * 0.5, h * 0.11);
+    c.fillStyle = '#ff2b2b'; c.fillRect(x + w * 0.3, y + h * 0.52, w * 0.12, h * 0.04);
+    c.fillStyle = '#2b6bff'; c.fillRect(x + w * 0.5, y + h * 0.52, w * 0.12, h * 0.04);
+    c.fillStyle = '#05050c';
+    c.beginPath(); c.arc(x + w * 0.22, y + h * 0.82, w * 0.07, 0, 7); c.fill();
+    c.beginPath(); c.arc(x + w * 0.78, y + h * 0.82, w * 0.07, 0, 7); c.fill();
+    var bx = x + w * 0.5, by = y + h * 0.34;
+    c.strokeStyle = '#ff2e88'; c.lineWidth = Math.max(3, w * 0.018); c.lineCap = 'round';
+    c.beginPath(); c.arc(bx - w * 0.05, by + h * 0.14, w * 0.11, 0, 7); c.stroke();
+    c.beginPath(); c.arc(bx + w * 0.16, by - h * 0.12, w * 0.11, 0, 7); c.stroke();
+    c.beginPath(); c.moveTo(bx - w * 0.05, by + h * 0.14); c.lineTo(bx + w * 0.1, by - h * 0.02); c.lineTo(bx + w * 0.16, by - h * 0.12); c.stroke();
+    c.fillStyle = '#0a0a14';
+    c.beginPath(); c.arc(bx + w * 0.02, by - h * 0.1, w * 0.045, 0, 7); c.fill();
+    c.fillRect(bx - w * 0.02, by - h * 0.06, w * 0.1, h * 0.12);
+  }
+  function artBoat(c, x, y, w, h, g) {
+    drawSky(c, x, y, w, h * 0.5, g);
+    drawSun(c, x + w * 0.78, y + h * 0.2, w * 0.07, g);
+    drawSea(c, x, y + h * 0.5, w, h * 0.5, g);
+    drawPalm(c, x + w * 0.9, y + h * 0.52, h * 0.4, '#05020e');
+    var by = y + h * 0.62;
+    c.fillStyle = '#eef4ff';
+    c.beginPath();
+    c.moveTo(x + w * 0.12, by); c.lineTo(x + w * 0.88, by - h * 0.06);
+    c.lineTo(x + w * 0.82, by + h * 0.08); c.lineTo(x + w * 0.2, by + h * 0.1);
+    c.closePath(); c.fill();
+    c.fillStyle = '#0b1020'; c.fillRect(x + w * 0.42, by - h * 0.1, w * 0.2, h * 0.06);
+    c.strokeStyle = '#ff5c9d'; c.fillStyle = '#ff5c9d'; c.lineWidth = Math.max(2, w * 0.012); c.lineCap = 'round';
+    c.beginPath(); c.ellipse(x + w * 0.45, y + h * 0.2, w * 0.11, h * 0.05, -0.3, 0, 7); c.fill();
+    c.beginPath(); c.moveTo(x + w * 0.55, y + h * 0.18);
+    c.quadraticCurveTo(x + w * 0.68, y + h * 0.1, x + w * 0.66, y + h * 0.02); c.stroke();
+    c.beginPath(); c.arc(x + w * 0.66, y + h * 0.01, w * 0.02, 0, 7); c.fill();
+  }
+  function artSwamp(c, x, y, w, h, g) {
+    drawSky(c, x, y, w, h * 0.55, g);
+    drawSun(c, x + w * 0.5, y + h * 0.3, w * 0.08, g);
+    c.fillStyle = '#0a2418'; c.fillRect(x, y + h * 0.55, w, h * 0.45);
+    c.fillStyle = g.glow + '33'; c.fillRect(x, y + h * 0.55, w, 2);
+    c.strokeStyle = '#04120c'; c.lineWidth = Math.max(3, w * 0.02);
+    c.beginPath(); c.moveTo(x + w * 0.12, y + h * 0.6); c.lineTo(x + w * 0.1, y + h * 0.05); c.stroke();
+    c.beginPath(); c.moveTo(x + w * 0.88, y + h * 0.6); c.lineTo(x + w * 0.9, y + h * 0.02); c.stroke();
+    c.strokeStyle = '#1d4a2e'; c.lineWidth = 1;
+    for (var i = 0; i < 8; i++) {
+      c.beginPath(); c.moveTo(x + w * (0.06 + i * 0.02), y + h * 0.22);
+      c.lineTo(x + w * (0.06 + i * 0.02), y + h * (0.3 + Math.random() * 0.12)); c.stroke();
+    }
+    var gy = y + h * 0.72;
+    c.fillStyle = '#2e4d2a';
+    c.beginPath(); c.ellipse(x + w * 0.5, gy, w * 0.34, h * 0.09, 0, 0, 7); c.fill();
+    c.beginPath(); c.ellipse(x + w * 0.82, gy - h * 0.01, w * 0.12, h * 0.05, 0, 0, 7); c.fill();
+    c.fillStyle = '#ffd21f';
+    c.beginPath(); c.arc(x + w * 0.78, gy - h * 0.06, w * 0.015, 0, 7); c.fill();
+    c.fillStyle = '#e8f2e0';
+    for (var t = 0; t < 5; t++) {
+      c.beginPath();
+      c.moveTo(x + w * (0.86 + t * 0.02), gy - h * 0.05);
+      c.lineTo(x + w * (0.87 + t * 0.02), gy - h * 0.02);
+      c.lineTo(x + w * (0.88 + t * 0.02), gy - h * 0.05);
+      c.fill();
+    }
+  }
+  function artVault(c, x, y, w, h, g) {
+    c.fillStyle = '#14101f'; c.fillRect(x, y, w, h);
+    c.fillStyle = '#3a3f4d';
+    c.beginPath(); c.arc(x + w * 0.5, y + h * 0.42, w * 0.34, 0, 7); c.fill();
+    c.fillStyle = '#232733';
+    c.beginPath(); c.arc(x + w * 0.5, y + h * 0.42, w * 0.26, 0, 7); c.fill();
+    c.strokeStyle = '#565e70'; c.lineWidth = Math.max(2, w * 0.012);
+    for (var i = 0; i < 8; i++) {
+      var a = i * Math.PI / 4;
+      c.beginPath();
+      c.moveTo(x + w * 0.5, y + h * 0.42);
+      c.lineTo(x + w * 0.5 + Math.cos(a) * w * 0.26, y + h * 0.42 + Math.sin(a) * w * 0.26);
+      c.stroke();
+    }
+    c.fillStyle = g.glow;
+    c.beginPath(); c.arc(x + w * 0.5, y + h * 0.42, w * 0.06, 0, 7); c.fill();
+    c.fillStyle = '#c9a227';
+    c.beginPath(); c.ellipse(x + w * 0.2, y + h * 0.88, w * 0.13, h * 0.07, 0, 0, 7); c.fill();
+    c.beginPath(); c.ellipse(x + w * 0.8, y + h * 0.88, w * 0.13, h * 0.07, 0, 0, 7); c.fill();
+    c.fillStyle = '#05050c';
+    c.beginPath(); c.arc(x + w * 0.5, y + h * 0.62, w * 0.07, 0, 7); c.fill();
+    c.fillRect(x + w * 0.43, y + h * 0.68, w * 0.14, h * 0.2);
+    c.strokeStyle = '#05050c'; c.lineWidth = Math.max(3, w * 0.02); c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x + w * 0.45, y + h * 0.78); c.lineTo(x + w * 0.72, y + h * 0.7); c.stroke();
+  }
+  function artLogo(c, x, y, w, h, g) {
+    c.fillStyle = g.dark; c.fillRect(x, y, w, h);
+    var vg = c.createLinearGradient(x, y, x + w, y + h);
+    vg.addColorStop(0, g.glow); vg.addColorStop(0.5, g.neon); vg.addColorStop(1, g.bot);
+    c.font = '900 ' + (h * 0.52) + 'px "Arial Black", Arial, sans-serif';
+    c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round';
+    c.strokeStyle = '#12082b'; c.lineWidth = Math.max(3, h * 0.02);
+    c.strokeText('VI', x + w / 2, y + h * 0.34);
+    c.fillStyle = vg; c.fillText('VI', x + w / 2, y + h * 0.34);
+    drawPalm(c, x + w * 0.3, y + h * 0.62, h * 0.34, '#12082b');
+    drawPalm(c, x + w * 0.68, y + h * 0.62, h * 0.3, '#12082b');
+    heavyText(c, (S.title || 'LEONIDA').toUpperCase(), x + w / 2, y + h * 0.74, w * 0.13, '#ffffff');
+    var tag = (S.tag || '').toUpperCase();
+    if (tag) {
+      c.font = '900 ' + (w * 0.052) + 'px Arial, sans-serif';
+      c.textAlign = 'center'; c.fillStyle = g.glow;
+      c.fillText(tag, x + w / 2, y + h * 0.88);
+    }
+  }
+
+  // ---------- photo ----------
+
+  function paintPhoto(c, px, py, pw, ph) {
+    if (!S.img) return;
+    var iw = S.img.width, ih = S.img.height;
+    var scale = Math.max(pw / iw, ph / ih) * S.zoom;
+    var dw = iw * scale, dh = ih * scale;
+    var dx = px + (pw - dw) / 2 + S.px;
+    var dy = py + (ph - dh) / 2 + S.py;
+    c.save();
+    c.beginPath(); c.rect(px, py, pw, ph); c.clip();
+    c.drawImage(S.img, dx, dy, dw, dh);
+    c.restore();
+  }
+  function limitPan(pw, ph) {
+    if (!S.img) return;
+    var iw = S.img.width, ih = S.img.height;
+    var scale = Math.max(pw / iw, ph / ih) * S.zoom;
+    var dw = iw * scale, dh = ih * scale;
+    var mx = Math.max(0, (dw - pw) / 2), my = Math.max(0, (dh - ph) / 2);
+    S.px = Math.max(-mx, Math.min(mx, S.px));
+    S.py = Math.max(-my, Math.min(my, S.py));
+  }
+  function buildSample() {
+    var sc = document.createElement('canvas');
+    sc.width = 800; sc.height = 1000;
+    var x = sc.getContext('2d');
+    var g = GRADES[S.grade];
+    drawSky(x, 0, 0, 800, 620, g);
+    drawSun(x, 400, 260, 70, g);
+    drawSea(x, 0, 620, 800, 380, g);
+    drawCity(x, 0, 420, 800, 200, g);
+    drawPalm(x, 120, 980, 420, '#05020e');
+    drawPalm(x, 700, 980, 360, '#05020e');
+    x.fillStyle = '#14081f';
+    x.beginPath(); x.arc(330, 560, 42, 0, 7); x.fill();
+    x.beginPath(); x.moveTo(270, 980); x.quadraticCurveTo(280, 640, 330, 610);
+    x.quadraticCurveTo(380, 640, 390, 980); x.closePath(); x.fill();
+    x.beginPath(); x.arc(470, 540, 46, 0, 7); x.fill();
+    x.beginPath(); x.moveTo(400, 980); x.quadraticCurveTo(412, 620, 470, 590);
+    x.quadraticCurveTo(528, 620, 540, 980); x.closePath(); x.fill();
+    return sc;
+  }
+
+  // ---------- render ----------
+
+  function render() {
+    var size = SIZES[S.size], W = size[0], H = size[1];
+    var g = GRADES[S.grade];
+    cv.width = W; cv.height = H;
+    cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H);
+    if (S.layout === 'grid') paintGrid(W, H, g);
+    else paintHero(W, H, g);
+  }
+  function paintGrid(W, H, g) {
+    var gut = Math.round(W * 0.012);
+    var pw = (W - 4 * gut) / 3, ph = (H - 4 * gut) / 3;
+    var X = function (col) { return gut + col * (pw + gut); };
+    var Y = function (row) { return gut + row * (ph + gut); };
+    artHeli(cx, X(0), Y(0), pw, ph, g);
+    artStreet(cx, X(1), Y(0), pw, ph, g);
+    artCar(cx, X(2), Y(0), pw, ph, g);
+    artBiker(cx, X(0), Y(1), pw, ph, g);
+    centre = { x: X(1), y: Y(1), w: pw, h: ph };
+    limitPan(pw, ph);
+    if (S.img) {
+      paintPhoto(cx, X(1), Y(1), pw, ph);
+    } else {
+      cx.fillStyle = g.dark; cx.fillRect(X(1), Y(1), pw, ph);
+      heavyText(cx, 'ADD PHOTO', X(1) + pw / 2, Y(1) + ph / 2, pw * 0.08, '#ffffff');
+    }
+    outline(cx, X(1), Y(1), pw, ph, g);
+    artBoat(cx, X(2), Y(1), pw, ph, g);
+    artSwamp(cx, X(0), Y(2), pw, ph, g);
+    artLogo(cx, X(1), Y(2), pw, ph, g);
+    artVault(cx, X(2), Y(2), pw, ph, g);
+    full = null;
+  }
+  function paintHero(W, H, g) {
+    full = { x: 0, y: 0, w: W, h: H };
+    centre = null;
+    limitPan(W, H);
+    if (S.img) {
+      paintPhoto(cx, 0, 0, W, H);
+    } else {
+      cx.fillStyle = g.dark; cx.fillRect(0, 0, W, H);
+      heavyText(cx, 'ADD PHOTO', W / 2, H / 2, W * 0.06, '#ffffff');
+    }
+    var bandH = H * 0.26, bandY = H - bandH;
+    var fade = cx.createLinearGradient(0, bandY - H * 0.06, 0, H);
+    fade.addColorStop(0, 'rgba(5,2,14,0)');
+    fade.addColorStop(0.35, 'rgba(5,2,14,0.92)');
+    fade.addColorStop(1, '#05020e');
+    cx.fillStyle = fade;
+    cx.fillRect(0, bandY - H * 0.06, W, bandH + H * 0.06);
+    var vg = cx.createLinearGradient(0, bandY, 0, bandY + bandH * 0.55);
+    vg.addColorStop(0, g.glow); vg.addColorStop(0.5, g.neon); vg.addColorStop(1, g.bot);
+    cx.font = '900 ' + (bandH * 0.52) + 'px "Arial Black", Arial, sans-serif';
+    cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.lineJoin = 'round';
+    cx.strokeStyle = '#12082b'; cx.lineWidth = Math.max(3, bandH * 0.02);
+    cx.strokeText('VI', W / 2, bandY + bandH * 0.3);
+    cx.fillStyle = vg; cx.fillText('VI', W / 2, bandY + bandH * 0.3);
+    heavyText(cx, (S.title || 'LEONIDA').toUpperCase(), W / 2, bandY + bandH * 0.66, W * 0.075, '#ffffff');
+    var tag = (S.tag || '').toUpperCase();
+    if (tag) {
+      cx.font = '900 ' + (W * 0.028) + 'px Arial, sans-serif';
+      cx.textAlign = 'center'; cx.fillStyle = g.glow;
+      cx.fillText(tag, W / 2, bandY + bandH * 0.88);
+    }
+    outline(cx, 0, 0, W, H, g);
+  }
+
+  // ---------- export ----------
+
+  function exportPNG() {
+    var size = SIZES[S.size];
+    var tmp = document.createElement('canvas');
+    tmp.width = size[0]; tmp.height = size[1];
+    var tc = tmp.getContext('2d');
+    var keep = cx;
+    cx = tc;
+    var g = GRADES[S.grade];
+    tc.fillStyle = '#000'; tc.fillRect(0, 0, size[0], size[1]);
+    if (S.layout === 'grid') paintGrid(size[0], size[1], g);
+    else paintHero(size[0], size[1], g);
+    cx = keep;
+    render(); // redraw the preview so its panel rects stay in sync
+    tmp.toBlob(function (blob) {
+      if (!blob) return;
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'leonida-cover-' + S.size + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    }, 'image/png');
+  }
+
+  // ---------- photo loading ----------
+
+  function loadFile(file) {
+    if (!file || !file.type || file.type.indexOf('image/') !== 0) return;
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      S.img = img; S.zoom = 1; S.px = 0; S.py = 0;
+      document.getElementById('zoom').value = 1;
+      document.getElementById('zoomVal').textContent = '1.00×';
+      render();
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }
+  function loadSample() {
+    S.img = buildSample(); S.zoom = 1; S.px = 0; S.py = 0;
+    document.getElementById('zoom').value = 1;
+    document.getElementById('zoomVal').textContent = '1.00×';
+    render();
+  }
+
+  // ---------- wiring ----------
+
+  document.getElementById('file').addEventListener('change', function (e) {
+    loadFile(e.target.files && e.target.files[0]);
+  });
+  document.getElementById('sampleBtn').addEventListener('click', loadSample);
+  document.getElementById('exportBtn').addEventListener('click', exportPNG);
+
+  document.getElementById('zoom').addEventListener('input', function (e) {
+    S.zoom = parseFloat(e.target.value);
+    document.getElementById('zoomVal').textContent = S.zoom.toFixed(2) + '×';
+    render();
+  });
+  document.getElementById('title').addEventListener('input', function (e) {
+    S.title = e.target.value; render();
+  });
+  document.getElementById('tagline').addEventListener('input', function (e) {
+    S.tag = e.target.value; render();
+  });
+
+  function pickGrade(name) {
+    S.grade = name;
+    document.getElementById('gradeName').textContent = GRADES[name].label;
+    ['sunset', 'neon', 'teal'].forEach(function (k) {
+      document.getElementById('g-' + k).classList.toggle('on', k === name);
+    });
+    render();
+  }
+  document.getElementById('g-sunset').addEventListener('click', function () { pickGrade('sunset'); });
+  document.getElementById('g-neon').addEventListener('click', function () { pickGrade('neon'); });
+  document.getElementById('g-teal').addEventListener('click', function () { pickGrade('teal'); });
+
+  function pickLayout(name) {
+    S.layout = name;
+    document.getElementById('l-grid').classList.toggle('on', name === 'grid');
+    document.getElementById('l-hero').classList.toggle('on', name === 'hero');
+    render();
+  }
+  document.getElementById('l-grid').addEventListener('click', function () { pickLayout('grid'); });
+  document.getElementById('l-hero').addEventListener('click', function () { pickLayout('hero'); });
+
+  function pickSize(name) {
+    S.size = name;
+    ['square', 'portrait', 'story'].forEach(function (k) {
+      document.getElementById('s-' + k).classList.toggle('on', k === name);
+    });
+    render();
+  }
+  document.getElementById('s-square').addEventListener('click', function () { pickSize('square'); });
+  document.getElementById('s-portrait').addEventListener('click', function () { pickSize('portrait'); });
+  document.getElementById('s-story').addEventListener('click', function () { pickSize('story'); });
+
+  // Drag the photo to pan it.
+  var drag = null;
+  function toCanvas(e) {
+    var r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height };
+  }
+  function photoBox() { return S.layout === 'grid' ? centre : full; }
+  cv.addEventListener('pointerdown', function (e) {
+    if (!S.img) return;
+    var p = toCanvas(e), box = photoBox();
+    if (!box) return;
+    if (p.x >= box.x && p.x <= box.x + box.w && p.y >= box.y && p.y <= box.y + box.h) {
+      drag = { x: p.x, y: p.y, px: S.px, py: S.py };
+      cv.classList.add('grabbing');
+      cv.setPointerCapture(e.pointerId);
+    }
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var p = toCanvas(e);
+    S.px = drag.px + (p.x - drag.x);
+    S.py = drag.py + (p.y - drag.y);
+    var box = photoBox();
+    if (box) limitPan(box.w, box.h);
+    render();
+  });
+  function stopDrag() { drag = null; cv.classList.remove('grabbing'); }
+  cv.addEventListener('pointerup', stopDrag);
+  cv.addEventListener('pointercancel', stopDrag);
+
+  // Drop a photo anywhere on the page to load it.
+  window.addEventListener('dragover', function (e) { e.preventDefault(); });
+  window.addEventListener('drop', function (e) {
+    e.preventDefault();
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    loadFile(f);
+  });
+
+  // Screenshot mode for the maker's screenshots: ?shot=cover shows the
+  // cover alone (no editor chrome); layout/grade/size are honoured too,
+  // e.g. ?shot=cover&layout=hero&grade=neon&size=square
+  (function applyShot() {
+    var q = new URLSearchParams(window.location.search);
+    if (q.get('grade') && GRADES[q.get('grade')]) pickGrade(q.get('grade'));
+    if (q.get('layout') === 'hero' || q.get('layout') === 'grid') pickLayout(q.get('layout'));
+    if (q.get('size') && SIZES[q.get('size')]) pickSize(q.get('size'));
+    if (q.get('shot') === 'cover') document.body.classList.add('shot');
+  })();
+
+  // Start with the built-in sample so the cover is never empty.
+  loadSample();
+})();
+</script>
+</body>
+</html>
